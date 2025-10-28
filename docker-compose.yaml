@@ -1,0 +1,59 @@
+﻿version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: messenger-postgres
+    environment:
+      POSTGRES_DB: messenger
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: random_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - messenger-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  messengerserver:
+    image: messengerserver
+    build:
+      context: .
+      dockerfile: MessengerServer/Dockerfile
+    container_name: messenger-app
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=messenger;Username=postgres;Password=random_password
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - messenger-network
+    
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: messenger-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@messenger.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - messenger-network
+
+volumes:
+  postgres_data:
+
+networks:
+  messenger-network:
+    driver: bridge
